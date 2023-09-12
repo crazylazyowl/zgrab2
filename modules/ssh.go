@@ -100,8 +100,11 @@ func (s *SSHScanner) Scan(t zgrab2.ScanTarget) (zgrab2.ScanStatus, interface{}, 
 	sshConfig.ConnLog = data
 	sshConfig.ClientVersion = s.config.ClientID
 	sshConfig.HelloOnly = s.config.HelloOnly
-	if err := sshConfig.SetHostKeyAlgorithms(s.config.HostKeyAlgorithms); err != nil {
-		log.Fatal(err)
+	if len(s.config.HostKeyAlgorithms) > 0 {
+		sshConfig.HostKeyAlgorithms = make([]string, 0)
+		if err := sshConfig.SetHostKeyAlgorithms(s.config.HostKeyAlgorithms); err != nil {
+			log.Fatal(err)
+		}
 	}
 	if err := sshConfig.SetKexAlgorithms(s.config.KexAlgorithms); err != nil {
 		log.Fatal(err)
