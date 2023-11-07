@@ -401,6 +401,8 @@ func (t *Transport) RoundTrip(req *Request) (*Response, error) {
 		} else {
 			resp, err = pconn.roundTrip(treq)
 		}
+		ra := pconn.conn.RemoteAddr().String()
+		resp.RemoteIP = strings.Split(ra, ":")[0]
 		if err == nil {
 			return resp, nil
 		}
@@ -1212,7 +1214,6 @@ func useProxy(addr string) bool {
 // http://proxy.com|http           http to proxy, http to anywhere after that
 //
 // Note: no support to https to the proxy yet.
-//
 type connectMethod struct {
 	proxyURL     *url.URL // nil for no proxy, else full proxy URL
 	targetScheme string   // "http" or "https"
