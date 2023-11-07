@@ -11,6 +11,7 @@ import (
 	"context"
 	"crypto/sha1"
 	"crypto/sha256"
+	"encoding/base64"
 	"encoding/csv"
 	"encoding/hex"
 	"errors"
@@ -80,6 +81,9 @@ type Flags struct {
 
 	// WithBodyLength enables adding the body_size field to the Response
 	WithBodyLength bool `long:"with-body-size" description:"Enable the body_size attribute, for how many bytes actually read"`
+
+	Base64 bool `long:"base64" description:"Encode response body with Base64."`
+	Hex    bool `long:"hex" description:"Encode response body with Hex."`
 }
 
 // A Results object is returned by the HTTP module's Scanner.Scan()
@@ -91,6 +95,8 @@ type Results struct {
 	// RedirectResponseChain is non-empty is the scanner follows a redirect.
 	// It contains all redirect response prior to the final response.
 	RedirectResponseChain []*http.Response `json:"redirect_response_chain,omitempty"`
+
+	Port uint16 `json:"port"`
 }
 
 // Module is an implementation of the zgrab2.Module interface.
@@ -407,6 +413,11 @@ func (scan *scan) getCheckRedirect() func(*http.Request, *http.Response, []*http
 				m.Write(b.Bytes())
 				res.BodySHA256 = m.Sum(nil)
 			}
+			if scan.scanner.config.Base64 {
+				res.BodyText = base64.StdEncoding.EncodeToString([]byte(res.BodyText))
+			} else if scan.scanner.config.Hex {
+				res.BodyText = hex.EncodeToString([]byte(res.BodyText))
+			}
 		}
 
 		if len(via) > scan.scanner.config.MaxRedirects {
@@ -475,6 +486,7 @@ func (scanner *Scanner) newHTTPScan(t *zgrab2.ScanTarget, useHTTPS bool) *scan {
 	} else {
 		port = uint16(scanner.config.BaseFlags.Port)
 	}
+	ret.results.Port = port
 	ret.url = getHTTPURL(useHTTPS, host, port, scanner.config.Endpoint)
 
 	return &ret
@@ -601,6 +613,11 @@ func (scan *scan) Grab() *zgrab2.ScanError {
 			m := sha256.New()
 			m.Write(buf.Bytes())
 			scan.results.Response.BodySHA256 = m.Sum(nil)
+		}
+		if scan.scanner.config.Base64 {
+			scan.results.Response.BodyText = base64.StdEncoding.EncodeToString([]byte(scan.results.Response.BodyText))
+		} else if scan.scanner.config.Hex {
+			scan.results.Response.BodyText = hex.EncodeToString([]byte(scan.results.Response.BodyText))
 		}
 	}
 
