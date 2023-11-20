@@ -118,10 +118,18 @@ func (s *SSHScanner) Scan(t zgrab2.ScanTarget) (zgrab2.ScanStatus, interface{}, 
 		data.Banner = strings.TrimSpace(banner)
 		return nil
 	}
-	_, err := ssh.Dial("tcp", rhost, sshConfig)
-	// TODO FIXME: Distinguish error types
-	status := zgrab2.TryGetScanStatus(err)
-	return status, data, err
+
+	client, err := ssh.Dial("tcp", rhost, sshConfig)
+	if err != nil {
+		return zgrab2.TryGetScanStatus(err), nil, err
+	}
+
+	if t.Domain != "" {
+		ra := client.Conn.RemoteAddr()
+		data.RemoteIP = strings.Split(ra.String(), ":")[0]
+	}
+
+	return zgrab2.SCAN_SUCCESS, data, err
 }
 
 // Protocol returns the protocol identifer for the scanner.
