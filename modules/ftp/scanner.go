@@ -41,6 +41,8 @@ type ScanResults struct {
 	// TLSLog is the standard shared TLS handshake log.
 	// Only present if the FTPAuthTLS flag is set.
 	TLSLog *zgrab2.TLSLog `json:"tls,omitempty"`
+
+	RemoteIP string `json:"remote_ip,omitempty"`
 }
 
 // Flags are the FTP-specific command-line flags. Taken from the original zgrab.
@@ -239,13 +241,13 @@ func (ftp *Connection) GetFTPSCertificates() error {
 }
 
 // Scan performs the configured scan on the FTP server, as follows:
-// * Read the banner into results.Banner (if it is not a 2XX response, bail)
-// * If the FTPAuthTLS flag is not set, finish.
-// * Send the AUTH TLS command to the server. If the response is not 2XX, then
-//   send the AUTH SSL command. If the response is not 2XX, then finish.
-// * Perform ths TLS handshake / any configured TLS scans, populating
-//   results.TLSLog.
-// * Return SCAN_SUCCESS, &results, nil
+//   - Read the banner into results.Banner (if it is not a 2XX response, bail)
+//   - If the FTPAuthTLS flag is not set, finish.
+//   - Send the AUTH TLS command to the server. If the response is not 2XX, then
+//     send the AUTH SSL command. If the response is not 2XX, then finish.
+//   - Perform ths TLS handshake / any configured TLS scans, populating
+//     results.TLSLog.
+//   - Return SCAN_SUCCESS, &results, nil
 func (s *Scanner) Scan(t zgrab2.ScanTarget) (status zgrab2.ScanStatus, result interface{}, thrown error) {
 	var err error
 	conn, err := t.Open(&s.config.BaseFlags)
@@ -282,5 +284,11 @@ func (s *Scanner) Scan(t zgrab2.ScanTarget) (status zgrab2.ScanStatus, result in
 			return zgrab2.SCAN_APPLICATION_ERROR, &ftp.results, err
 		}
 	}
+
+	if t.Domain != "" {
+		ra := cn.RemoteAddr().String()
+		ftp.results.RemoteIP = strings.Split(ra, ":")[0]
+	}
+
 	return zgrab2.SCAN_SUCCESS, &ftp.results, nil
 }
