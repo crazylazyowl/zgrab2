@@ -95,8 +95,6 @@ type Results struct {
 	// RedirectResponseChain is non-empty is the scanner follows a redirect.
 	// It contains all redirect response prior to the final response.
 	RedirectResponseChain []*http.Response `json:"redirect_response_chain,omitempty"`
-
-	Port uint16 `json:"port"`
 }
 
 // Module is an implementation of the zgrab2.Module interface.
@@ -486,7 +484,6 @@ func (scanner *Scanner) newHTTPScan(t *zgrab2.ScanTarget, useHTTPS bool) *scan {
 	} else {
 		port = uint16(scanner.config.BaseFlags.Port)
 	}
-	ret.results.Port = port
 	ret.url = getHTTPURL(useHTTPS, host, port, scanner.config.Endpoint)
 
 	return &ret
