@@ -1,6 +1,8 @@
 package modules
 
 import (
+	"strings"
+
 	log "github.com/sirupsen/logrus"
 	"github.com/zmap/zgrab2"
 )
@@ -82,6 +84,10 @@ func (s *TLSScanner) Scan(t zgrab2.ScanTarget) (zgrab2.ScanStatus, interface{}, 
 				if log.HandshakeLog.ServerHello != nil {
 					// If we got far enough to get a valid ServerHello, then
 					// consider it to be a positive TLS detection.
+					if t.Domain != "" {
+						ra := conn.RemoteAddr().String()
+						log.RemoteIP = strings.Split(ra, ":")[0]
+					}
 					return zgrab2.TryGetScanStatus(err), log, err
 				}
 				// Otherwise, detection failed.
@@ -89,7 +95,12 @@ func (s *TLSScanner) Scan(t zgrab2.ScanTarget) (zgrab2.ScanStatus, interface{}, 
 		}
 		return zgrab2.TryGetScanStatus(err), nil, err
 	}
-	return zgrab2.SCAN_SUCCESS, conn.GetLog(), nil
+	log := conn.GetLog()
+	if t.Domain != "" {
+		ra := conn.RemoteAddr().String()
+		log.RemoteIP = strings.Split(ra, ":")[0]
+	}
+	return zgrab2.SCAN_SUCCESS, log, nil
 }
 
 // Protocol returns the protocol identifer for the scanner.

@@ -276,6 +276,7 @@ type TLSLog struct {
 	HandshakeLog *tls.ServerHandshake `json:"handshake_log"`
 	// This will be nil if heartbleed is not checked because of client configuration flags
 	HeartbleedLog *tls.Heartbleed `json:"heartbleed_log,omitempty"`
+	RemoteIP      string          `json:"remote_ip,omitempty"`
 }
 
 func (z *TLSConnection) GetLog() *TLSLog {
