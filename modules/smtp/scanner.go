@@ -330,10 +330,7 @@ func (scanner *Scanner) Scan(target zgrab2.ScanTarget) (zgrab2.ScanStatus, inter
 		return sr, result, fmt.Errorf("SMTP error code %d returned in banner grab", bannerResponseCode)
 	}
 
-	if target.Domain != "" {
-		ra := conn.Conn.RemoteAddr().String()
-		result.RemoteIP = strings.Split(ra, ":")[0]
-	}
+	result.RemoteIP = strings.Split(conn.Conn.RemoteAddr().String(), ":")[0]
 
 	return sr, result, nil
 }

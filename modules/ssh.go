@@ -124,10 +124,7 @@ func (s *SSHScanner) Scan(t zgrab2.ScanTarget) (zgrab2.ScanStatus, interface{}, 
 		return zgrab2.TryGetScanStatus(err), nil, err
 	}
 
-	if t.Domain != "" {
-		ra := client.Conn.RemoteAddr()
-		data.RemoteIP = strings.Split(ra.String(), ":")[0]
-	}
+	data.RemoteIP = strings.Split(client.Conn.RemoteAddr().String(), ":")[0]
 
 	return zgrab2.SCAN_SUCCESS, data, err
 }

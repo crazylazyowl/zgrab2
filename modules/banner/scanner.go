@@ -51,12 +51,13 @@ type Scanner struct {
 
 // ScanResults instances are returned by the module's Scan function.
 type Results struct {
-	Banner   string `json:"banner,omitempty"`
-	Length   int    `json:"length,omitempty"`
-	MD5      string `json:"md5,omitempty"`
-	SHA1     string `json:"sha1,omitempty"`
-	SHA256   string `json:"sha25,omitempty"`
-	RemoteIP string `json:"remote_ip,omitempty"`
+	Banner   string         `json:"banner,omitempty"`
+	Length   int            `json:"length,omitempty"`
+	MD5      string         `json:"md5,omitempty"`
+	SHA1     string         `json:"sha1,omitempty"`
+	SHA256   string         `json:"sha25,omitempty"`
+	RemoteIP string         `json:"remote_ip,omitempty"`
+	TLSLog   *zgrab2.TLSLog `json:"tls,omitempty"`
 }
 
 var NoMatchError = errors.New("pattern did not match")
@@ -151,6 +152,8 @@ func (s *Scanner) Scan(target zgrab2.ScanTarget) (zgrab2.ScanStatus, interface{}
 		readErr error
 	)
 
+	results := &Results{}
+
 	for try := 0; try < s.config.MaxTries; try++ {
 		conn, err = target.Open(&s.config.BaseFlags)
 		if err != nil {
@@ -164,6 +167,7 @@ func (s *Scanner) Scan(target zgrab2.ScanTarget) (zgrab2.ScanStatus, interface{}
 			if err = tlsConn.Handshake(); err != nil {
 				continue
 			}
+			results.TLSLog = tlsConn.GetLog()
 			conn = tlsConn
 		}
 		break
@@ -193,14 +197,9 @@ func (s *Scanner) Scan(target zgrab2.ScanTarget) (zgrab2.ScanStatus, interface{}
 		return zgrab2.TryGetScanStatus(readErr), nil, readErr
 	}
 
-	results := &Results{
-		Length: len(data),
-	}
+	results.Length = len(data)
 
-	if target.Domain != "" {
-		ra := conn.RemoteAddr().String()
-		results.RemoteIP = strings.Split(ra, ":")[0]
-	}
+	results.RemoteIP = strings.Split(conn.RemoteAddr().String(), ":")[0]
 
 	if results.Length > 0 {
 		if s.config.Hex {

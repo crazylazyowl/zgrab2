@@ -285,10 +285,7 @@ func (s *Scanner) Scan(t zgrab2.ScanTarget) (status zgrab2.ScanStatus, result in
 		}
 	}
 
-	if t.Domain != "" {
-		ra := cn.RemoteAddr().String()
-		ftp.results.RemoteIP = strings.Split(ra, ":")[0]
-	}
+	ftp.results.RemoteIP = strings.Split(cn.RemoteAddr().String(), ":")[0]
 
 	return zgrab2.SCAN_SUCCESS, &ftp.results, nil
 }

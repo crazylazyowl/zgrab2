@@ -3,8 +3,6 @@
 package smb
 
 import (
-	"strings"
-
 	log "github.com/sirupsen/logrus"
 	"github.com/zmap/zgrab2"
 	"github.com/zmap/zgrab2/lib/smb/smb"
@@ -133,10 +131,10 @@ func (scanner *Scanner) Scan(target zgrab2.ScanTarget) (zgrab2.ScanStatus, inter
 		}
 	}
 
-	if target.Domain != "" {
-		ra := conn.RemoteAddr().String()
-		result.RemoteIP = strings.Split(ra, ":")[0]
-	}
+	// if target.Domain != "" {
+	// 	ra := conn.RemoteAddr().String()
+	// 	result.RemoteIP = strings.Split(ra, ":")[0]
+	// }
 
 	return zgrab2.SCAN_SUCCESS, result, nil
 }
