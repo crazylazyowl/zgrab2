@@ -401,9 +401,9 @@ func (t *Transport) RoundTrip(req *Request) (*Response, error) {
 		} else {
 			resp, err = pconn.roundTrip(treq)
 		}
-		ra := pconn.conn.RemoteAddr().String()
-		resp.RemoteIP = strings.Split(ra, ":")[0]
 		if err == nil {
+			ra := pconn.conn.RemoteAddr().String()
+			resp.RemoteIP = strings.Split(ra, ":")[0]
 			return resp, nil
 		}
 		if !pconn.shouldRetryRequest(req, err) {
