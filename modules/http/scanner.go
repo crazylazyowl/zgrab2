@@ -83,13 +83,10 @@ type Flags struct {
 	// WithBodyLength enables adding the body_size field to the Response
 	WithBodyLength bool `long:"with-body-size" description:"Enable the body_size attribute, for how many bytes actually read"`
 
-<<<<<<< HEAD
 	Base64 bool `long:"base64" description:"Encode response body with Base64."`
 	Hex    bool `long:"hex" description:"Encode response body with Hex."`
-=======
 	// Extract the raw header as it is on the wire
 	RawHeaders bool `long:"raw-headers" description:"Extract raw response up through headers"`
->>>>>>> master
 }
 
 // A Results object is returned by the HTTP module's Scanner.Scan()

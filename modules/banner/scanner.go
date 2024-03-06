@@ -17,10 +17,7 @@ import (
 	"os"
 	"regexp"
 	"strconv"
-<<<<<<< HEAD
 	"strings"
-=======
->>>>>>> master
 
 	"github.com/zmap/zgrab2"
 )
@@ -54,7 +51,6 @@ type Scanner struct {
 
 // ScanResults instances are returned by the module's Scan function.
 type Results struct {
-<<<<<<< HEAD
 	Banner   string         `json:"banner,omitempty"`
 	Length   int            `json:"length,omitempty"`
 	MD5      string         `json:"md5,omitempty"`
@@ -62,14 +58,6 @@ type Results struct {
 	SHA256   string         `json:"sha25,omitempty"`
 	RemoteIP string         `json:"remote_ip,omitempty"`
 	TLSLog   *zgrab2.TLSLog `json:"tls,omitempty"`
-=======
-	Banner string         `json:"banner,omitempty"`
-	Length int            `json:"length,omitempty"`
-	TLSLog *zgrab2.TLSLog `json:"tls,omitempty"`
-	MD5    string `json:"md5,omitempty"`
-	SHA1   string `json:"sha1,omitempty"`
-	SHA256 string `json:"sha25,omitempty"`
->>>>>>> master
 }
 
 var NoMatchError = errors.New("pattern did not match")
@@ -141,11 +129,7 @@ func (s *Scanner) Init(flags zgrab2.ScanFlags) error {
 		s.regex = regexp.MustCompile(s.config.Pattern)
 	}
 	if len(f.ProbeFile) != 0 {
-<<<<<<< HEAD
 		s.probe, err = os.ReadFile(f.ProbeFile)
-=======
-		s.probe, err = ioutil.ReadFile(f.ProbeFile)
->>>>>>> master
 		if err != nil {
 			log.Fatal("Failed to open probe file")
 			return zgrab2.ErrInvalidArguments
@@ -168,11 +152,8 @@ func (s *Scanner) Scan(target zgrab2.ScanTarget) (zgrab2.ScanStatus, interface{}
 		readErr error
 	)
 
-<<<<<<< HEAD
 	results := &Results{}
 
-=======
->>>>>>> master
 	for try := 0; try < s.config.MaxTries; try++ {
 		conn, err = target.Open(&s.config.BaseFlags)
 		if err != nil {
@@ -192,7 +173,6 @@ func (s *Scanner) Scan(target zgrab2.ScanTarget) (zgrab2.ScanStatus, interface{}
 		break
 	}
 
-
 	if err != nil {
 		return zgrab2.TryGetScanStatus(err), nil, err
 	}
@@ -206,11 +186,7 @@ func (s *Scanner) Scan(target zgrab2.ScanTarget) (zgrab2.ScanStatus, interface{}
 		if err != nil {
 			continue
 		}
-<<<<<<< HEAD
 		if readErr != nil && !errors.Is(readErr, io.EOF) {
-=======
-		if readErr != io.EOF && readErr != nil {
->>>>>>> master
 			continue
 		}
 		break
@@ -218,7 +194,6 @@ func (s *Scanner) Scan(target zgrab2.ScanTarget) (zgrab2.ScanStatus, interface{}
 	if err != nil {
 		return zgrab2.TryGetScanStatus(err), nil, err
 	}
-<<<<<<< HEAD
 	if readErr != nil && !errors.Is(readErr, io.EOF) {
 		return zgrab2.TryGetScanStatus(readErr), nil, readErr
 	}
@@ -254,46 +229,4 @@ func (s *Scanner) Scan(target zgrab2.ScanTarget) (zgrab2.ScanStatus, interface{}
 	}
 
 	return zgrab2.SCAN_SUCCESS, results, nil
-=======
-	if readErr != io.EOF && readErr != nil {
-		return zgrab2.TryGetScanStatus(readErr), nil, readErr
-	}
-
-	var results Results
-
-	if s.config.Hex {
-		results.Banner = hex.EncodeToString(data)
-	} else if s.config.Base64 {
-		results.Banner = base64.StdEncoding.EncodeToString(data)
-	} else {
-		results.Banner = string(data)
-	}
-	results.Length = len(data)
-
-	if len(data) > 0 {
-		if s.config.MD5 {
-			digest := md5.Sum(data)
-			results.MD5 = hex.EncodeToString(digest[:])
-		}
-		if s.config.SHA1 {
-			digest := sha1.Sum(data)
-			results.SHA1 = hex.EncodeToString(digest[:])
-		}
-		if s.config.SHA256 {
-			digest := sha256.Sum256(data)
-			results.SHA256 = hex.EncodeToString(digest[:])
-		}
-	}
-	if tlsConn != nil {
-		results.TLSLog = tlsConn.GetLog()
-	}
-	if s.regex == nil {
-		return zgrab2.SCAN_SUCCESS, &results, nil
-	}
-	if s.regex.Match(data) {
-		return zgrab2.SCAN_SUCCESS, &results, nil
-	}
-
-	return zgrab2.SCAN_PROTOCOL_ERROR, &results, NoMatchError
->>>>>>> master
 }
