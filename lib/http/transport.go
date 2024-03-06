@@ -11,6 +11,7 @@ package http
 
 import (
 	"bufio"
+	"bytes"
 	"compress/gzip"
 	"container/list"
 	"context"
@@ -198,6 +199,10 @@ type Transport struct {
 	h2transport   *http2Transport // non-nil if http2 wired up
 
 	// TODO: tunable on max per-host TCP dials in flight (Issue 13957)
+
+	// Enable raw read buffering and raw header extraction
+	// zgrab2-specific
+	RawHeaderBuffer bool
 }
 
 // onceSetNextProtoDefaults initializes TLSNextProto.
@@ -1029,6 +1034,8 @@ func (t *Transport) dialConn(ctx context.Context, cm connectMethod) (*persistCon
 		pconn.conn = conn
 	}
 
+	pconn.tee = &TeeConn{}
+
 	// Proxy setup.
 	switch {
 	case cm.proxyURL == nil:
@@ -1060,8 +1067,10 @@ func (t *Transport) dialConn(ctx context.Context, cm connectMethod) (*persistCon
 		// Read response.
 		// Okay to use and discard buffered reader here, because
 		// TLS server will not speak until spoken to.
-		br := bufio.NewReader(conn)
-		resp, err := ReadResponse(br, connectReq)
+		tee := TeeConn{
+			br: bufio.NewReader(conn),
+		}
+		resp, err := ReadResponseTee(&tee, connectReq)
 		if err != nil {
 			conn.Close()
 			return nil, err
@@ -1125,11 +1134,47 @@ func (t *Transport) dialConn(ctx context.Context, cm connectMethod) (*persistCon
 		}
 	}
 
-	pconn.br = bufio.NewReader(pconn)
+	pconn.tee.br = bufio.NewReader(pconn)
+	pconn.tee.enabled = t.RawHeaderBuffer
 	pconn.bw = bufio.NewWriter(persistConnWriter{pconn})
 	go pconn.readLoop()
 	go pconn.writeLoop()
 	return pconn, nil
+}
+
+// The underlying br Reader is bufio, so it will perform read-ahead.
+// The underlying tb is a bytes buffer, that acts as a tee, receiving
+// the raw bytes for reads against the io.Reader backing br.
+type TeeConn struct {
+	enabled bool          // tee writes to tb are enabled
+	tb      bytes.Buffer  // buffer that tr tees into
+	br      *bufio.Reader // from conn
+}
+
+// To get the current position in tb as seen by the buffered io reader,
+// we need to subtract out the buffered portion of the bufio reader.
+func (t *TeeConn) ReadPos() int {
+	l := t.tb.Len()
+	if l == 0 {
+		return 0
+	}
+	return l - t.br.Buffered()
+}
+
+func (t *TeeConn) Bytes(s, e int) []byte {
+	if s >= t.tb.Len() {
+		return nil
+	}
+	return t.tb.Bytes()[s:e]
+}
+
+func (t *TeeConn) BufioReader() *bufio.Reader {
+	return t.br
+}
+
+// Stops the tee writes to t.tb
+func (t *TeeConn) Disable() {
+	t.enabled = false
 }
 
 // persistConnWriter is the io.Writer written to by pc.bw.
@@ -1278,7 +1323,7 @@ type persistConn struct {
 	cacheKey  connectMethodKey
 	conn      net.Conn
 	tlsState  *tls.ConnectionState
-	br        *bufio.Reader       // from conn
+	tee       *TeeConn            // from conn, includes a raw buffer and tee
 	bw        *bufio.Writer       // to conn
 	nwrite    int64               // bytes written
 	reqch     chan requestAndChan // written by roundTrip; read by readLoop
@@ -1330,6 +1375,11 @@ func (pc *persistConn) Read(p []byte) (n int, err error) {
 		pc.sawEOF = true
 	}
 	pc.readLimit -= int64(n)
+	if pc.tee.enabled && n > 0 {
+		if n, err := pc.tee.tb.Write(p[:n]); err != nil {
+			return n, err
+		}
+	}
 	return
 }
 
@@ -1483,7 +1533,7 @@ func (pc *persistConn) readLoop() {
 	alive := true
 	for alive {
 		pc.readLimit = pc.maxHeaderResponseSize()
-		_, err := pc.br.Peek(1)
+		_, err := pc.tee.br.Peek(1)
 
 		pc.mu.Lock()
 		if pc.numExpectedResponses == 0 {
@@ -1504,7 +1554,7 @@ func (pc *persistConn) readLoop() {
 			closeErr = err
 		}
 
-		if err != nil {
+		if err != nil && (!pc.sawEOF || resp == nil) {
 			if pc.readLimit <= 0 {
 				err = fmt.Errorf("net/http: server response headers exceeded %d bytes; aborted", pc.maxHeaderResponseSize())
 			}
@@ -1637,7 +1687,7 @@ func (pc *persistConn) readLoopPeekFailLocked(peekErr error) {
 	if pc.closed != nil {
 		return
 	}
-	if n := pc.br.Buffered(); n > 0 {
+	if n := pc.tee.br.Buffered(); n > 0 {
 	}
 	if peekErr == io.EOF {
 		// common case.
@@ -1652,12 +1702,15 @@ func (pc *persistConn) readLoopPeekFailLocked(peekErr error) {
 // trace is optional.
 func (pc *persistConn) readResponse(rc requestAndChan, trace *httptrace.ClientTrace) (resp *Response, err error) {
 	if trace != nil && trace.GotFirstResponseByte != nil {
-		if peek, err := pc.br.Peek(1); err == nil && len(peek) == 1 {
+		if peek, err := pc.tee.br.Peek(1); err == nil && len(peek) == 1 {
 			trace.GotFirstResponseByte()
 		}
 	}
-	resp, err = ReadResponse(pc.br, rc.req)
+	resp, err = ReadResponseTee(pc.tee, rc.req)
 	if err != nil {
+		if err == io.ErrUnexpectedEOF {
+			pc.sawEOF = true
+		}
 		return
 	}
 	if rc.continueCh != nil {
@@ -1672,7 +1725,7 @@ func (pc *persistConn) readResponse(rc requestAndChan, trace *httptrace.ClientTr
 	}
 	if resp.StatusCode == 100 {
 		pc.readLimit = pc.maxHeaderResponseSize() // reset the limit
-		resp, err = ReadResponse(pc.br, rc.req)
+		resp, err = ReadResponseTee(pc.tee, rc.req)
 		if err != nil {
 			return
 		}
