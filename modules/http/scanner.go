@@ -85,7 +85,7 @@ type Flags struct {
 	// Extract the raw header as it is on the wire
 	RawHeaders bool `long:"raw-headers" description:"Extract raw response up through headers"`
 
-	// Check the final response's status code.
+	// StatusCode checks the status code of the final response.
 	StatusCode int `long:"status-code" description:"Expected status code of the final response."`
 }
 
