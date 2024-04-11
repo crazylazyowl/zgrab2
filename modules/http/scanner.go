@@ -531,8 +531,10 @@ func (scan *scan) Grab() *zgrab2.ScanError {
 		defer resp.Body.Close()
 	}
 
-	if scan.scanner.config.StatusCode != 0 && resp.StatusCode != scan.scanner.config.StatusCode {
-		return zgrab2.DetectScanError(errors.New("unexpeced status code"))
+	if scan.scanner.config.StatusCode != 0 {
+		if resp.StatusCode != scan.scanner.config.StatusCode {
+			return zgrab2.DetectScanError(errors.New("unexpected status code"))
+		}
 	}
 
 	scan.results.Response = resp
