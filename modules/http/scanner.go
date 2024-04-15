@@ -84,6 +84,9 @@ type Flags struct {
 
 	// Extract the raw header as it is on the wire
 	RawHeaders bool `long:"raw-headers" description:"Extract raw response up through headers"`
+
+	// Str checks the substring inclusion in the reponse body.
+	Str string `long:"str" descriptin:"Check the substring inclusion in the reponse body."`
 }
 
 // A Results object is returned by the HTTP module's Scanner.Scan()
@@ -600,6 +603,12 @@ func (scan *scan) Grab() *zgrab2.ScanError {
 
 	if scan.scanner.config.WithBodyLength {
 		scan.results.Response.BodyTextLength = int64(len(scan.results.Response.BodyText))
+	}
+
+	if scan.scanner.config.Str != "" {
+		if !strings.Contains(scan.results.Response.BodyText, scan.scanner.config.Str) {
+			return zgrab2.DetectScanError(errors.New("substring not found in the response body"))
+		}
 	}
 
 	if len(scan.results.Response.BodyText) > 0 {
