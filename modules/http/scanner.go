@@ -85,7 +85,7 @@ type Flags struct {
 	// Extract the raw header as it is on the wire
 	RawHeaders bool `long:"raw-headers" description:"Extract raw response up through headers"`
 
-	Str string `long:"str" descriptin:"Check the substring is included in the response body."`
+	Str string `long:"str" description:"Check the substring is included in the response body."`
 }
 
 // A Results object is returned by the HTTP module's Scanner.Scan()
@@ -605,6 +605,7 @@ func (scan *scan) Grab() *zgrab2.ScanError {
 	}
 
 	if scan.scanner.config.Str != "" {
+		fmt.Println(scan.scanner.config.Str)
 		if !strings.Contains(scan.results.Response.BodyText, scan.scanner.config.Str) {
 			return zgrab2.DetectScanError(errors.New("str not found in the response body"))
 		}
