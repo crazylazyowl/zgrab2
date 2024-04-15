@@ -85,8 +85,7 @@ type Flags struct {
 	// Extract the raw header as it is on the wire
 	RawHeaders bool `long:"raw-headers" description:"Extract raw response up through headers"`
 
-	// StatusCode checks the status code of the final response.
-	StatusCode int `long:"status-code" description:"Expected status code of the final response."`
+	StatusCode int `long:"status-code" description:"Expected status code of the response."`
 }
 
 // A Results object is returned by the HTTP module's Scanner.Scan()
