@@ -605,7 +605,6 @@ func (scan *scan) Grab() *zgrab2.ScanError {
 	}
 
 	if scan.scanner.config.Str != "" {
-		fmt.Println(scan.scanner.config.Str)
 		if !strings.Contains(scan.results.Response.BodyText, scan.scanner.config.Str) {
 			return zgrab2.DetectScanError(errors.New("str not found in the response body"))
 		}
