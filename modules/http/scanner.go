@@ -11,6 +11,7 @@ import (
 	"context"
 	"crypto/sha1"
 	"crypto/sha256"
+	"encoding/base64"
 	"encoding/csv"
 	"encoding/hex"
 	"errors"
@@ -84,6 +85,8 @@ type Flags struct {
 
 	// Extract the raw header as it is on the wire
 	RawHeaders bool `long:"raw-headers" description:"Extract raw response up through headers"`
+
+	Bytes string `long:"bytes" description:"Check the bytes is included in the response body (always encoded as base64)"`
 }
 
 // A Results object is returned by the HTTP module's Scanner.Scan()
@@ -103,10 +106,11 @@ type Module struct {
 
 // Scanner is the implementation of the zgrab2.Scanner interface.
 type Scanner struct {
-	config        *Flags
-	customHeaders map[string]string
-	requestBody   string
-	decodedHashFn func([]byte) string
+	config         *Flags
+	customHeaders  map[string]string
+	requestBody    string
+	decodedHashFn  func([]byte) string
+	expcectedBytes []byte
 }
 
 // scan holds the state for a single scan. This may entail multiple connections.
@@ -229,6 +233,14 @@ func (scanner *Scanner) Init(flags zgrab2.ScanFlags) error {
 		}
 	} else if fl.ComputeDecodedBodyHashAlgorithm != "" {
 		log.Panicf("Invalid ComputeDecodedBodyHashAlgorithm choice made it through zflags: %s", scanner.config.ComputeDecodedBodyHashAlgorithm)
+	}
+
+	if fl.Bytes != "" {
+		data, err := base64.StdEncoding.DecodeString(fl.Bytes)
+		if err != nil {
+			log.Panicf("Invalid base64 is passed in --bytes option")
+		}
+		scanner.expcectedBytes = data
 	}
 
 	return nil
@@ -609,6 +621,12 @@ func (scan *scan) Grab() *zgrab2.ScanError {
 			m := sha256.New()
 			m.Write(buf.Bytes())
 			scan.results.Response.BodySHA256 = m.Sum(nil)
+		}
+	}
+
+	if scan.scanner.expcectedBytes != nil {
+		if !bytes.Contains(buf.Bytes(), scan.scanner.expcectedBytes) {
+			return zgrab2.DetectScanError(errors.New("bytes not found in the response body"))
 		}
 	}
 
