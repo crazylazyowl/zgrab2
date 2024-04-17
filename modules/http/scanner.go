@@ -84,6 +84,8 @@ type Flags struct {
 
 	// Extract the raw header as it is on the wire
 	RawHeaders bool `long:"raw-headers" description:"Extract raw response up through headers"`
+
+	StatusCode int `long:"status-code" description:"Expected response status code"`
 }
 
 // A Results object is returned by the HTTP module's Scanner.Scan()
@@ -229,6 +231,12 @@ func (scanner *Scanner) Init(flags zgrab2.ScanFlags) error {
 		}
 	} else if fl.ComputeDecodedBodyHashAlgorithm != "" {
 		log.Panicf("Invalid ComputeDecodedBodyHashAlgorithm choice made it through zflags: %s", scanner.config.ComputeDecodedBodyHashAlgorithm)
+	}
+
+	if fl.StatusCode != 0 {
+		if fl.StatusCode < 100 || fl.StatusCode >= 600 {
+			log.Panicf("Status code is allowed only between 100 and 599.")
+		}
 	}
 
 	return nil
@@ -521,6 +529,13 @@ func (scan *scan) Grab() *zgrab2.ScanError {
 	if resp != nil && resp.Body != nil {
 		defer resp.Body.Close()
 	}
+
+	if scan.scanner.config.StatusCode != 0 {
+		if resp.StatusCode != scan.scanner.config.StatusCode {
+			return zgrab2.DetectScanError(errors.New("unexpected reponse status code"))
+		}
+	}
+
 	scan.results.Response = resp
 	if err != nil {
 		if urlError, ok := err.(*url.Error); ok {
