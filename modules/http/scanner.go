@@ -85,7 +85,7 @@ type Flags struct {
 	// Extract the raw header as it is on the wire
 	RawHeaders bool `long:"raw-headers" description:"Extract raw response up through headers"`
 
-	Str string `long:"str" description:"Check the substring is included in the response body."`
+	Str string `long:"str" description:"String to check if it's included in the response body."`
 }
 
 // A Results object is returned by the HTTP module's Scanner.Scan()
@@ -109,6 +109,8 @@ type Scanner struct {
 	customHeaders map[string]string
 	requestBody   string
 	decodedHashFn func([]byte) string
+
+	expectedStr string
 }
 
 // scan holds the state for a single scan. This may entail multiple connections.
@@ -231,6 +233,10 @@ func (scanner *Scanner) Init(flags zgrab2.ScanFlags) error {
 		}
 	} else if fl.ComputeDecodedBodyHashAlgorithm != "" {
 		log.Panicf("Invalid ComputeDecodedBodyHashAlgorithm choice made it through zflags: %s", scanner.config.ComputeDecodedBodyHashAlgorithm)
+	}
+
+	if fl.Str != "" {
+		scanner.expectedStr = fl.Str
 	}
 
 	return nil
@@ -604,12 +610,6 @@ func (scan *scan) Grab() *zgrab2.ScanError {
 		scan.results.Response.BodyTextLength = int64(len(scan.results.Response.BodyText))
 	}
 
-	if scan.scanner.config.Str != "" {
-		if !strings.Contains(scan.results.Response.BodyText, scan.scanner.config.Str) {
-			return zgrab2.DetectScanError(errors.New("str not found in the response body"))
-		}
-	}
-
 	if len(scan.results.Response.BodyText) > 0 {
 		if scan.scanner.decodedHashFn != nil {
 			scan.results.Response.BodyHash = scan.scanner.decodedHashFn([]byte(scan.results.Response.BodyText))
@@ -617,6 +617,12 @@ func (scan *scan) Grab() *zgrab2.ScanError {
 			m := sha256.New()
 			m.Write(buf.Bytes())
 			scan.results.Response.BodySHA256 = m.Sum(nil)
+		}
+	}
+
+	if scan.scanner.expectedStr != "" {
+		if !strings.Contains(scan.results.Response.BodyText, scan.scanner.expectedStr) {
+			return zgrab2.DetectScanError(errors.New("str not found in the response body"))
 		}
 	}
 
