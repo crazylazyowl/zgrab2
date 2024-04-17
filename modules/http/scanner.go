@@ -551,12 +551,6 @@ func (scan *scan) Grab() *zgrab2.ScanError {
 		defer resp.Body.Close()
 	}
 
-	if scan.scanner.config.StatusCode != 0 {
-		if resp.StatusCode != scan.scanner.config.StatusCode {
-			return zgrab2.DetectScanError(errors.New("unexpected reponse status code"))
-		}
-	}
-
 	scan.results.Response = resp
 	if err != nil {
 		if urlError, ok := err.(*url.Error); ok {
@@ -646,6 +640,12 @@ func (scan *scan) Grab() *zgrab2.ScanError {
 			m := sha256.New()
 			m.Write(buf.Bytes())
 			scan.results.Response.BodySHA256 = m.Sum(nil)
+		}
+	}
+
+	if scan.scanner.config.StatusCode != 0 {
+		if resp.StatusCode != scan.scanner.config.StatusCode {
+			return zgrab2.DetectScanError(errors.New("unexpected reponse status code"))
 		}
 	}
 
