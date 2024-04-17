@@ -87,6 +87,12 @@ type Flags struct {
 	Hex    bool `long:"hex" description:"Encode response body with Hex."`
 	// Extract the raw header as it is on the wire
 	RawHeaders bool `long:"raw-headers" description:"Extract raw response up through headers"`
+
+	StatusCode int `long:"status-code" description:"Expected response status code"`
+
+	Str string `long:"str" description:"String to check if it's included in the response body."`
+
+	Bytes string `long:"bytes" description:"Bytes sequence to check if it's included in the response body. Must be valid base64"`
 }
 
 // A Results object is returned by the HTTP module's Scanner.Scan()
@@ -110,6 +116,10 @@ type Scanner struct {
 	customHeaders map[string]string
 	requestBody   string
 	decodedHashFn func([]byte) string
+
+	expectedStr string
+
+	expectedBytes []byte
 }
 
 // scan holds the state for a single scan. This may entail multiple connections.
@@ -232,6 +242,24 @@ func (scanner *Scanner) Init(flags zgrab2.ScanFlags) error {
 		}
 	} else if fl.ComputeDecodedBodyHashAlgorithm != "" {
 		log.Panicf("Invalid ComputeDecodedBodyHashAlgorithm choice made it through zflags: %s", scanner.config.ComputeDecodedBodyHashAlgorithm)
+	}
+
+	if fl.StatusCode != 0 {
+		if fl.StatusCode < 100 || fl.StatusCode >= 600 {
+			log.Panicf("Status code is allowed only between 100 and 599.")
+		}
+	}
+
+	if fl.Str != "" {
+		scanner.expectedStr = fl.Str
+	}
+
+	if fl.Bytes != "" {
+		data, err := base64.StdEncoding.DecodeString(fl.Bytes)
+		if err != nil {
+			log.Panicf("Invalid base64 is passed in --bytes option")
+		}
+		scanner.expectedBytes = data
 	}
 
 	return nil
@@ -529,6 +557,13 @@ func (scan *scan) Grab() *zgrab2.ScanError {
 	if resp != nil && resp.Body != nil {
 		defer resp.Body.Close()
 	}
+
+	if scan.scanner.config.StatusCode != 0 {
+		if resp.StatusCode != scan.scanner.config.StatusCode {
+			return zgrab2.DetectScanError(errors.New("unexpected reponse status code"))
+		}
+	}
+
 	scan.results.Response = resp
 	if err != nil {
 		if urlError, ok := err.(*url.Error); ok {
@@ -556,6 +591,7 @@ func (scan *scan) Grab() *zgrab2.ScanError {
 		readLen = resp.ContentLength
 	}
 	io.CopyN(buf, resp.Body, readLen)
+
 	encoder, encoding, certain := charset.DetermineEncoding(buf.Bytes(), resp.Header.Get("content-type"))
 
 	bodyText := ""
@@ -622,6 +658,18 @@ func (scan *scan) Grab() *zgrab2.ScanError {
 			scan.results.Response.BodyText = base64.StdEncoding.EncodeToString([]byte(scan.results.Response.BodyText))
 		} else if scan.scanner.config.Hex {
 			scan.results.Response.BodyText = hex.EncodeToString([]byte(scan.results.Response.BodyText))
+		}
+	}
+
+	if scan.scanner.expectedStr != "" {
+		if !strings.Contains(scan.results.Response.BodyText, scan.scanner.expectedStr) {
+			return zgrab2.DetectScanError(errors.New("str not found in the response body"))
+		}
+	}
+
+	if scan.scanner.expectedBytes != nil {
+		if !bytes.Contains(buf.Bytes(), scan.scanner.expectedBytes) {
+			return zgrab2.DetectScanError(errors.New("bytes not found in the response body"))
 		}
 	}
 
