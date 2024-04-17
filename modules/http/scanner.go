@@ -85,7 +85,7 @@ type Flags struct {
 	// Extract the raw header as it is on the wire
 	RawHeaders bool `long:"raw-headers" description:"Extract raw response up through headers"`
 
-	StatusCode int `long:"status-code" description:"Expected status code of the response."`
+	StatusCode int `long:"status-code" description:"Expected response status code"`
 }
 
 // A Results object is returned by the HTTP module's Scanner.Scan()
@@ -532,7 +532,7 @@ func (scan *scan) Grab() *zgrab2.ScanError {
 
 	if scan.scanner.config.StatusCode != 0 {
 		if resp.StatusCode != scan.scanner.config.StatusCode {
-			return zgrab2.DetectScanError(errors.New("unexpected status code"))
+			return zgrab2.DetectScanError(errors.New("unexpected reponse status code"))
 		}
 	}
 
