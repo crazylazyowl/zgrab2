@@ -86,6 +86,8 @@ type Flags struct {
 	RawHeaders bool `long:"raw-headers" description:"Extract raw response up through headers"`
 
 	StatusCode int `long:"status-code" description:"Expected response status code"`
+
+	Str string `long:"str" description:"String to check if it's included in the response body."`
 }
 
 // A Results object is returned by the HTTP module's Scanner.Scan()
@@ -109,6 +111,8 @@ type Scanner struct {
 	customHeaders map[string]string
 	requestBody   string
 	decodedHashFn func([]byte) string
+
+	expectedStr string
 }
 
 // scan holds the state for a single scan. This may entail multiple connections.
@@ -237,6 +241,10 @@ func (scanner *Scanner) Init(flags zgrab2.ScanFlags) error {
 		if fl.StatusCode < 100 || fl.StatusCode >= 600 {
 			log.Panicf("Status code is allowed only between 100 and 599.")
 		}
+	}
+
+	if fl.Str != "" {
+		scanner.expectedStr = fl.Str
 	}
 
 	return nil
@@ -624,6 +632,12 @@ func (scan *scan) Grab() *zgrab2.ScanError {
 			m := sha256.New()
 			m.Write(buf.Bytes())
 			scan.results.Response.BodySHA256 = m.Sum(nil)
+		}
+	}
+
+	if scan.scanner.expectedStr != "" {
+		if !strings.Contains(scan.results.Response.BodyText, scan.scanner.expectedStr) {
+			return zgrab2.DetectScanError(errors.New("str not found in the response body"))
 		}
 	}
 
