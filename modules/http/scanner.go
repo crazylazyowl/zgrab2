@@ -11,6 +11,7 @@ import (
 	"context"
 	"crypto/sha1"
 	"crypto/sha256"
+	"encoding/base64"
 	"encoding/csv"
 	"encoding/hex"
 	"errors"
@@ -88,6 +89,8 @@ type Flags struct {
 	StatusCode int `long:"status-code" description:"Expected response status code"`
 
 	Str string `long:"str" description:"String to check if it's included in the response body."`
+
+	Bytes string `long:"bytes" description:"Bytes sequence to check if it's included in the response body. Must be valid base64"`
 }
 
 // A Results object is returned by the HTTP module's Scanner.Scan()
@@ -113,6 +116,8 @@ type Scanner struct {
 	decodedHashFn func([]byte) string
 
 	expectedStr string
+
+	expectedBytes []byte
 }
 
 // scan holds the state for a single scan. This may entail multiple connections.
@@ -245,6 +250,14 @@ func (scanner *Scanner) Init(flags zgrab2.ScanFlags) error {
 
 	if fl.Str != "" {
 		scanner.expectedStr = fl.Str
+	}
+
+	if fl.Bytes != "" {
+		data, err := base64.StdEncoding.DecodeString(fl.Bytes)
+		if err != nil {
+			log.Panicf("Invalid base64 is passed in --bytes option")
+		}
+		scanner.expectedBytes = data
 	}
 
 	return nil
@@ -571,6 +584,7 @@ func (scan *scan) Grab() *zgrab2.ScanError {
 		readLen = resp.ContentLength
 	}
 	io.CopyN(buf, resp.Body, readLen)
+
 	encoder, encoding, certain := charset.DetermineEncoding(buf.Bytes(), resp.Header.Get("content-type"))
 
 	bodyText := ""
@@ -638,6 +652,12 @@ func (scan *scan) Grab() *zgrab2.ScanError {
 	if scan.scanner.expectedStr != "" {
 		if !strings.Contains(scan.results.Response.BodyText, scan.scanner.expectedStr) {
 			return zgrab2.DetectScanError(errors.New("str not found in the response body"))
+		}
+	}
+
+	if scan.scanner.expectedBytes != nil {
+		if !bytes.Contains(buf.Bytes(), scan.scanner.expectedBytes) {
+			return zgrab2.DetectScanError(errors.New("bytes not found in the response body"))
 		}
 	}
 
