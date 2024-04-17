@@ -86,7 +86,7 @@ type Flags struct {
 	// Extract the raw header as it is on the wire
 	RawHeaders bool `long:"raw-headers" description:"Extract raw response up through headers"`
 
-	Bytes string `long:"bytes" description:"Check the bytes is included in the response body (always encoded as base64)"`
+	Bytes string `long:"bytes" description:"Bytes sequence to check if it's included in the response body. Must be valid base64"`
 }
 
 // A Results object is returned by the HTTP module's Scanner.Scan()
@@ -106,11 +106,12 @@ type Module struct {
 
 // Scanner is the implementation of the zgrab2.Scanner interface.
 type Scanner struct {
-	config         *Flags
-	customHeaders  map[string]string
-	requestBody    string
-	decodedHashFn  func([]byte) string
-	expcectedBytes []byte
+	config        *Flags
+	customHeaders map[string]string
+	requestBody   string
+	decodedHashFn func([]byte) string
+
+	expectedBytes []byte
 }
 
 // scan holds the state for a single scan. This may entail multiple connections.
@@ -240,7 +241,7 @@ func (scanner *Scanner) Init(flags zgrab2.ScanFlags) error {
 		if err != nil {
 			log.Panicf("Invalid base64 is passed in --bytes option")
 		}
-		scanner.expcectedBytes = data
+		scanner.expectedBytes = data
 	}
 
 	return nil
@@ -560,6 +561,7 @@ func (scan *scan) Grab() *zgrab2.ScanError {
 		readLen = resp.ContentLength
 	}
 	io.CopyN(buf, resp.Body, readLen)
+
 	encoder, encoding, certain := charset.DetermineEncoding(buf.Bytes(), resp.Header.Get("content-type"))
 
 	bodyText := ""
@@ -624,8 +626,8 @@ func (scan *scan) Grab() *zgrab2.ScanError {
 		}
 	}
 
-	if scan.scanner.expcectedBytes != nil {
-		if !bytes.Contains(buf.Bytes(), scan.scanner.expcectedBytes) {
+	if scan.scanner.expectedBytes != nil {
+		if !bytes.Contains(buf.Bytes(), scan.scanner.expectedBytes) {
 			return zgrab2.DetectScanError(errors.New("bytes not found in the response body"))
 		}
 	}
